@@ -85,3 +85,15 @@ A tool to share code snippets easily through Discord integration.
 [Launch Project 24](https://coreed-github-assignment04-projects-2524-code-discordapp-nfps14.streamlit.app/)
 
 ---
+
+### *Project 25: Web Scraping App*
+Scrapes websites to extract and display data in a user-friendly format.
+[Launch Project 25](https://coreed-github-assignment04-projects-2521-web-scrapingapp-nw5adx.streamlit.app/)
+
+---
+
+### *Project 26: BMI Calculator*
+A simple tool to calculate BMI using user input.
+[Launch Project 26](https://coreed-github-assignment-projects-2526-bmi-calculatorapp-ypdgvs.streamlit.app/)
+
+
