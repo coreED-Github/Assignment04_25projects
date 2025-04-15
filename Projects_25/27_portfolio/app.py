@@ -3,7 +3,7 @@ import streamlit as st
 from PIL import Image
 
 current_dir = Path(__file__).parent if "file_" in locals() else Path.cwd()
-css_file = "main.css"
+# css_file = "main.css"
 resume_file = current_dir / "assets" / "CV.pdf"
 profile_pic = current_dir / "assets" / "saira.jpg"
 
@@ -30,8 +30,8 @@ PROJECTS = {
 st.sidebar.title("Saira Nasir Portfolio")
 nav_selection = st.sidebar.radio("Go to", ["Home", "Education", "Skills", "Experience", "Projects", "Contact"])
 
-with open(css_file) as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# with open(css_file) as f:
+#     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 with open(resume_file, "rb") as pdf_file:
     PDFbyte = pdf_file.read()
