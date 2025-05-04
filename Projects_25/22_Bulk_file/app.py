@@ -1,60 +1,66 @@
-import os
 import streamlit as st
-import datetime
+import os
+import shutil
+from pathlib import Path
 
-def rename_files(folder_path, prefix, suffix, case, find_word, replace_word):
-    try:
-        files = os.listdir(folder_path)
+st.title("📁 Bulk File Renamer App")
+st.markdown("Upload multiple files or a folder, and rename all files in bulk based on your rules.")
+
+uploaded_files = st.file_uploader(
+    "Upload your files (drag and drop supported)", 
+    accept_multiple_files=True, 
+    type=None
+)
+
+upload_dir = Path("uploaded_files")
+upload_dir.mkdir(exist_ok=True)
+
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        with open(upload_dir / uploaded_file.name, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+    st.success(f"{len(uploaded_files)} files uploaded successfully!")
+
+    st.write("### Uploaded Files:")
+    for file in uploaded_files:
+        st.write(file.name)
+
+    st.write("---")
+
+    st.write("## 📝 Rename Options")
+
+    prefix = st.text_input("Add Prefix (Optional)", "")
+    suffix = st.text_input("Add Suffix (Optional)", "")
+    start_number = st.number_input("Start Numbering from", min_value=1, step=1, value=1)
+    numbering = st.checkbox("Add numbering to filenames")
+
+    if st.button("🔁 Rename Files"):
         renamed_files = []
-        for file in files:
-            old_name = os.path.join(folder_path, file)
-            new_name = file
+        files = list(upload_dir.iterdir())
+        for i, file_path in enumerate(files, start=start_number):
+            ext = file_path.suffix
+            original_name = file_path.stem
+            new_name = ""
 
-            if prefix:
-                new_name = prefix + new_name
-            if suffix:
-                new_name = new_name + suffix
+            if numbering:
+                new_name = f"{prefix}{i}{suffix}{ext}"
+            else:
+                new_name = f"{prefix}{original_name}{suffix}{ext}"
 
-            if case == "Uppercase":
-                new_name = new_name.upper()
-            elif case == "Lowercase":
-                new_name = new_name.lower()
+            new_path = file_path.parent / new_name
+            os.rename(file_path, new_path)
+            renamed_files.append(new_name)
 
-            if find_word and replace_word:
-                new_name = new_name.replace(find_word, replace_word)
+        st.success("Files renamed successfully!")
+        st.write("### Renamed Files:")
+        for name in renamed_files:
+            st.write(name)
 
-            current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-            new_name = f"{new_name}_{current_date}"
-
-            new_name_path = os.path.join(folder_path, new_name)
-            os.rename(old_name, new_name_path)
-            renamed_files.append((old_name, new_name_path))
-
-        return renamed_files
-    except Exception as e:
-        st.error(f"Error: {e}")
-        return []
-
-st.title("Bulk File Renamer")
-st.write("Rename your files based on specific conditions.")
-
-folder_path = st.text_input("Enter the folder path:")
-
-prefix = st.text_input("Prefix to add:")
-suffix = st.text_input("Suffix to add:")
-case = st.selectbox("Change case:", ["None", "Uppercase", "Lowercase"])
-find_word = st.text_input("Find word to replace:")
-replace_word = st.text_input("Replace with:")
-
-if st.button("Rename Files"):
-    if folder_path:
-        renamed_files = rename_files(folder_path, prefix, suffix, case, find_word, replace_word)
-        if renamed_files:
-            st.success("Files renamed successfully!")
-            st.write("Renamed Files:")
-            for old_name, new_name in renamed_files:
-                st.write(f"{old_name} -> {new_name}")
-        else:
-            st.error("No files renamed.")
-    else:
-        st.warning("Please enter a valid folder path.")
+        shutil.make_archive("renamed_files", 'zip', upload_dir)
+        with open("renamed_files.zip", "rb") as f:
+            st.download_button(
+                label="⬇️ Download Renamed Files as ZIP",
+                data=f,
+                file_name="renamed_files.zip",
+                mime="application/zip"
+            )

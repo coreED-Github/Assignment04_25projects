@@ -1,66 +1,70 @@
 import streamlit as st
 import requests
-from bs4 import BeautifulSoup
 
-def scrape_github_profile(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+def get_github_user_data(username):
 
-    try:
-        username = url.strip().split("github.com/")[-1].strip("/")
-        full_url = f"https://github.com/{username}"
-        response = requests.get(full_url, headers=headers)
+    url = f'https://api.github.com/users/{username}'
+    response = requests.get(url)
 
-        if response.status_code != 200:
-            return None
+    if response.status_code == 200:
+        user_data = response.json()
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        name = user_data.get('name', 'No name found')
+        bio = user_data.get('bio', 'No bio found')
+        avatar_url = user_data.get('avatar_url', '')
+        repos_url = user_data.get('repos_url', '')
+        followers = user_data.get('followers', 0)
+        following = user_data.get('following', 0)
+        public_repos = user_data.get('public_repos', 0)
+        company = user_data.get('company', 'Not available')
+        location = user_data.get('location', 'Not available')
+        blog = user_data.get('blog', 'Not available')
 
-        name_tag = soup.find('span', {'class': 'p-name'})
-        name = name_tag.get_text(strip=True) if name_tag else "Name not found"
-
-        bio_tag = soup.find('div', {'class': 'p-note'})
-        bio = bio_tag.get_text(strip=True) if bio_tag else "No bio available"
-
-        follower_tag = soup.find('a', href=f"/{username}?tab=followers")
-        followers = follower_tag.find('span').text.strip() if follower_tag else "0"
-
-        img_tag = soup.find('img', {'alt': 'Avatar'})
-        img_url = img_tag['src'] if img_tag and 'src' in img_tag.attrs else None
-
+        repos_response = requests.get(repos_url)
+        if repos_response.status_code == 200:
+            repos_data = repos_response.json()
+            repos_list = [(repo['name'], repo['html_url']) for repo in repos_data]
+        else:
+            repos_list = []
+        
         return {
-            "name": name,
-            "bio": bio,
-            "followers": followers,
-            "image_url": img_url,
-            "profile_link": full_url
+            'name': name,
+            'bio': bio,
+            'avatar_url': avatar_url,
+            'repos': repos_list,
+            'followers': followers,
+            'following': following,
+            'public_repos': public_repos,
+            'company': company,
+            'location': location,
+            'blog': blog
         }
-
-    except Exception as e:
+    else:
         return None
 
-st.set_page_config(page_title="GitHub Profile Scraper", layout="centered")
-st.title("GitHub Profile Scraper")
-st.write("Enter any public GitHub profile URL to view basic info:")
+st.title("GitHub Profile Information")
+username = st.text_input("Enter GitHub username:")
 
-user_input = st.text_input("Enter GitHub Profile URL")
+if username:
+    user_data = get_github_user_data(username)
+    if user_data:
+        st.subheader(f"Name: {user_data['name']}")
+        st.write(f"Bio: {user_data['bio']}")
+        st.image(user_data['avatar_url'], caption='Profile Image', width=150)
 
-if st.button("Scrape Profile"):
-    if user_input and "github.com" in user_input:
-        data = scrape_github_profile(user_input)
+        st.subheader("User Details:")
+        st.write(f"Followers: {user_data['followers']}")
+        st.write(f"Following: {user_data['following']}")
+        st.write(f"Public Repositories: {user_data['public_repos']}")
+        st.write(f"Company: {user_data['company']}")
+        st.write(f"Location: {user_data['location']}")
+        st.write(f"Blog: {user_data['blog']}")
 
-        if data:
-            if data["image_url"]:
-                st.image(data["image_url"], width=150)
-            else:
-                st.warning("Profile image not found.")
-
-            st.markdown(f"### 🧑 Name: {data['name']}")
-            st.markdown(f"### 📄 Bio: {data['bio']}")
-            st.markdown(f"### 👥 Followers: {data['followers']}")
-            st.markdown(f"[Visit GitHub Profile]({data['profile_link']})", unsafe_allow_html=True)
+        st.subheader("Repositories:")
+        if user_data['repos']:
+            for repo_name, repo_url in user_data['repos']:
+                st.markdown(f"- [{repo_name}]({repo_url})")
         else:
-            st.error("Could not fetch profile. Please check the URL or try again.")
+            st.write("No repositories found.")
     else:
-        st.warning("Please enter a valid GitHub profile URL.")
+        st.error("User not found. Please check the username and try again.")

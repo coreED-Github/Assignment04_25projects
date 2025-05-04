@@ -1,187 +1,182 @@
 import pygame
-import random
 import sys
+import numpy as np
+import math
+import random
+
+ROW_COUNT = 6
+COLUMN_COUNT = 7
+SQUARESIZE = 80
+RADIUS = int(SQUARESIZE / 2 - 8)
+width = COLUMN_COUNT * SQUARESIZE
+height = (ROW_COUNT + 2) * SQUARESIZE
+size = (width, height)
+
+BLUE = (0, 0, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+YELLOW = (255, 255, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+GREY = (200, 200, 200)
 
 pygame.init()
-
-#settings
-WIDTH, HEIGHT = 900, 600
-SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Treasure Runner - Ultimate Edition")
-
+screen = pygame.display.set_mode(size)
+pygame.display.set_caption("Connect Four")
 clock = pygame.time.Clock()
-font = pygame.font.SysFont("Arial", 28)
-# Colors
-WHITE = (255, 255, 255)
-RED = (200, 0, 0)
-GREEN = (0, 200, 0)
-YELLOW = (255, 255, 0)
-BLACK = (0, 0, 0)
-BLUE = (50, 50, 255)
 
-GRAVITY = 1
-LEVEL_TIME = 45
+myfont = pygame.font.SysFont("monospace", 50)
+small_font = pygame.font.SysFont("arial", 28)
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.image = pygame.Surface((50, 50))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.rect.x = 100
-        self.rect.y = HEIGHT - 100
-        self.vel_y = 0
-        self.health = 5
-        self.score = 0
+def create_board():
+    return np.zeros((ROW_COUNT, COLUMN_COUNT))
 
-    def update(self):
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] and self.rect.left > 0:
-            self.rect.x -= 6
-        if keys[pygame.K_RIGHT] and self.rect.right < WIDTH:
-            self.rect.x += 6
-        if keys[pygame.K_UP] and self.rect.top > 0:
-            self.rect.y -= 6
-        if keys[pygame.K_DOWN] and self.rect.bottom < HEIGHT:
-            self.rect.y += 6
+def drop_piece(board, row, col, piece):
+    board[row][col] = piece
 
-class Treasure(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((25, 25))
-        self.image.fill(YELLOW)
-        self.rect = self.image.get_rect(center=(x, y))
+def is_valid_location(board, col):
+    return board[ROW_COUNT - 1][col] == 0
 
-class Obstacle(pygame.sprite.Sprite):
-    def __init__(self, x, y, speed):
-        super().__init__()
-        self.image = pygame.Surface((40, 40))
-        self.image.fill(RED)
-        self.rect = self.image.get_rect(center=(x, y))
-        self.speed = speed
+def get_next_open_row(board, col):
+    for r in range(ROW_COUNT):
+        if board[r][col] == 0:
+            return r
 
-    def update(self):
-        self.rect.x += self.speed
-        if self.rect.left <= 0 or self.rect.right >= WIDTH:
-            self.speed *= -1
+def winning_move(board, piece):
+    for c in range(COLUMN_COUNT - 3):
+        for r in range(ROW_COUNT):
+            if all(board[r][c+i] == piece for i in range(4)):
+                return [(r, c+i) for i in range(4)]
 
-def draw_text(text, size, x, y, color=WHITE):
-    font_obj = pygame.font.SysFont("Arial", size, bold=True)
-    text_surf = font_obj.render(text, True, color)
-    SCREEN.blit(text_surf, (x, y))
+    for c in range(COLUMN_COUNT):
+        for r in range(ROW_COUNT - 3):
+            if all(board[r+i][c] == piece for i in range(4)):
+                return [(r+i, c) for i in range(4)]
 
-def draw_health_bar(health):
-    pygame.draw.rect(SCREEN, RED, (20, 20, 120, 25))
-    pygame.draw.rect(SCREEN, GREEN, (20, 20, 24 * health, 25))
-    draw_text("Health", 22, 20, 50)
+    for c in range(COLUMN_COUNT - 3):
+        for r in range(3, ROW_COUNT):
+            if all(board[r-i][c+i] == piece for i in range(4)):
+                return [(r-i, c+i) for i in range(4)]
 
-def draw_timer(seconds_left):
-    draw_text(f"Time: {int(seconds_left)}s", 22, WIDTH - 150, 20)
+    for c in range(COLUMN_COUNT - 3):
+        for r in range(ROW_COUNT - 3):
+            if all(board[r+i][c+i] == piece for i in range(4)):
+                return [(r+i, c+i) for i in range(4)]
+    return None
 
-#function
-def run_game(level):
-    player = Player()
-    player_group = pygame.sprite.Group(player)
-    treasure_group = pygame.sprite.Group()
-    obstacle_group = pygame.sprite.Group()
+def square_win(board, piece):
+    for c in range(COLUMN_COUNT - 1):
+        for r in range(ROW_COUNT - 1):
+            if board[r][c] == board[r+1][c] == board[r][c+1] == board[r+1][c+1] == piece:
+                return [(r, c), (r+1, c), (r, c+1), (r+1, c+1)]
+    return None
 
-    for _ in range(5 + level * 2):
-        x = random.randint(200, WIDTH - 50)
-        y = random.randint(100, HEIGHT - 100)
-        treasure_group.add(Treasure(x, y))
+def draw_board(board):
+    for c in range(COLUMN_COUNT):
+        for r in range(ROW_COUNT):
+            pygame.draw.rect(screen, BLUE, (c*SQUARESIZE, (r+1)*SQUARESIZE, SQUARESIZE, SQUARESIZE))
+            pygame.draw.circle(screen, BLACK, (int(c*SQUARESIZE + SQUARESIZE/2), int((r+1)*SQUARESIZE + SQUARESIZE/2)), RADIUS)
+    
+    for c in range(COLUMN_COUNT):
+        for r in range(ROW_COUNT):
+            piece = board[r][c]
+            if piece == 1:
+                pygame.draw.circle(screen, RED, (int(c*SQUARESIZE + SQUARESIZE/2), int((r+1)*SQUARESIZE + SQUARESIZE/2)), RADIUS)
+            elif piece == 2:
+                pygame.draw.circle(screen, YELLOW, (int(c*SQUARESIZE + SQUARESIZE/2), int((r+1)*SQUARESIZE + SQUARESIZE/2)), RADIUS)
 
-    for _ in range(3 + level):
-        x = random.randint(100, WIDTH - 100)
-        y = random.randint(150, HEIGHT - 100)
-        speed = random.choice([-3 - level, 3 + level])
-        obstacle_group.add(Obstacle(x, y, speed))
+def highlight_winning_line(line):
+    for r, c in line:
+        pygame.draw.circle(screen, GREEN, (int(c*SQUARESIZE + SQUARESIZE/2), int((r+1)*SQUARESIZE + SQUARESIZE/2)), RADIUS + 5)
 
-    start_ticks = pygame.time.get_ticks()
+def draw_message(text, color):
+    pygame.draw.rect(screen, BLACK, (0, 0, width, SQUARESIZE))
+    label = myfont.render(text, True, color)
+    screen.blit(label, (40, 10))
+    pygame.display.update()
 
-    running = True
-    while running:
-        clock.tick(60)
-        SCREEN.fill((30, 30, 60))
+def computer_move(board):
+    valid_cols = [c for c in range(COLUMN_COUNT) if is_valid_location(board, c)]
+    return random.choice(valid_cols)
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+def draw_endgame_options():
+    pygame.draw.rect(screen, GREY, (width//2 - 140, height - 70, 120, 50))
+    pygame.draw.rect(screen, GREY, (width//2 + 20, height - 70, 120, 50))
+    screen.blit(small_font.render("Quit", True, BLACK), (width//2 - 110, height - 60))
+    screen.blit(small_font.render("Continue", True, BLACK), (width//2 + 30, height - 60))
+    pygame.display.update()
 
-        seconds_passed = (pygame.time.get_ticks() - start_ticks) / 1000
-        time_left = max(0, LEVEL_TIME - seconds_passed)
+def animate_fill_bottom_to_top(board, col, row, piece):
+    for r in range(ROW_COUNT - 1, row - 1, -1):
+        board[r][col] = piece
+        draw_board(board)
+        pygame.display.update()
+        pygame.time.wait(50)
+        if r != row:
+            board[r][col] = 0
 
-        player_group.update()
-        obstacle_group.update()
+board = create_board()
+turn = 0
+game_over = False
 
-        player_group.draw(SCREEN)
-        treasure_group.draw(SCREEN)
-        obstacle_group.draw(SCREEN)
+draw_board(board)
+draw_message("Your Turn", RED)
 
-        draw_health_bar(player.health)
-        draw_timer(time_left)
-        draw_text(f"Score: {player.score}", 22, WIDTH // 2 - 50, 20)
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            sys.exit()
 
-        #Collision
-        hits = pygame.sprite.spritecollide(player, treasure_group, True)
-        if hits:
-            player.score += len(hits)
-
-        if pygame.sprite.spritecollide(player, obstacle_group, False):
-            player.health -= 1
-            pygame.time.delay(300)
-            if player.health <= 0:
-                return "gameover"
-
-        if player.score >= len(treasure_group) + len(hits):
-            return "win"
-
-        if time_left <= 0:
-            return "timeout"
-
-        pygame.display.flip()
-
-#Screens
-def end_screen(result):
-    SCREEN.fill(BLACK)
-    if result == "win":
-        draw_text("LEVEL COMPLETE!", 50, WIDTH // 2 - 180, HEIGHT // 2 - 50, GREEN)
-    elif result == "timeout":
-        draw_text("TIME UP!", 50, WIDTH // 2 - 100, HEIGHT // 2 - 50, YELLOW)
-    else:
-        draw_text("GAME OVER!", 50, WIDTH // 2 - 150, HEIGHT // 2 - 50, RED)
-    draw_text("Press R to Restart | Q to Quit", 28, WIDTH // 2 - 180, HEIGHT // 2 + 10, WHITE)
-    pygame.display.flip()
-    wait_for_input()
-
-def wait_for_input():
-    waiting = True
-    while waiting:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
-                    main()
-                elif event.key == pygame.K_q:
+        if game_over:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = event.pos
+                if width//2 - 140 <= x <= width//2 - 20 and height - 70 <= y <= height - 20:
                     pygame.quit()
                     sys.exit()
+                elif width//2 + 20 <= x <= width//2 + 140 and height - 70 <= y <= height - 20:
+                    board = create_board()
+                    draw_board(board)
+                    turn = 0
+                    game_over = False
+                    draw_message("Your Turn", RED)
 
-def main():
-    level = 1
-    while level <= 3:
-        result = run_game(level)
-        if result == "win":
-            level += 1
-        else:
-            end_screen(result)
-            return
-    SCREEN.fill(BLUE)
-    draw_text("CONGRATULATIONS! You completed all levels!", 32, WIDTH // 2 - 300, HEIGHT // 2 - 20, YELLOW)
-    draw_text("Press Q to Quit", 28, WIDTH // 2 - 100, HEIGHT // 2 + 40, WHITE)
-    pygame.display.flip()
-    wait_for_input()
+        elif turn == 0 and event.type == pygame.MOUSEBUTTONDOWN and not game_over:
+            col = int(math.floor(event.pos[0] / SQUARESIZE))
+            if is_valid_location(board, col):
+                row = get_next_open_row(board, col)
+                animate_fill_bottom_to_top(board, col, row, 1)
+                drop_piece(board, row, col, 1)
+                win_line = winning_move(board, 1) or square_win(board, 1)
+                draw_board(board)
 
-if __name__ == "__main__":
-    main()
+                if win_line:
+                    highlight_winning_line(win_line)
+                    draw_message("You Win!", GREEN)
+                    game_over = True
+                    draw_endgame_options()
+                else:
+                    turn = 1
+                    draw_message("Computer Turn", YELLOW)
+
+    if not game_over and turn == 1:
+        pygame.time.wait(600)
+        col = computer_move(board)
+        if is_valid_location(board, col):
+            row = get_next_open_row(board, col)
+            animate_fill_bottom_to_top(board, col, row, 2)
+            drop_piece(board, row, col, 2)
+            win_line = winning_move(board, 2) or square_win(board, 2)
+            draw_board(board)
+
+            if win_line:
+                highlight_winning_line(win_line)
+                draw_message("You Lost!", RED)
+                game_over = True
+                draw_endgame_options()
+            else:
+                turn = 0
+                draw_message("Your Turn", RED)
+
+    pygame.display.update()
+    clock.tick(60)
+

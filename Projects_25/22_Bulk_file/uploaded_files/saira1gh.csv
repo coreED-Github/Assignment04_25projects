@@ -1,0 +1,4 @@
+﻿,Category,From Unit,To Unit,Input Value,Converted Value
+0,Length,Meter,Kilometer,1000,1
+1,Mass,Gram,Kilogram,500,0.5
+2,Length,Meter,Meter,8,8
