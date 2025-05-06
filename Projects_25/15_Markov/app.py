@@ -1,125 +1,82 @@
 import streamlit as st
+import pdfplumber
+import os
 import random
-import re
-import time
-import networkx as nx
-import matplotlib.pyplot as plt
-from io import StringIO
+from collections import defaultdict
 
-st.set_page_config(page_title="Markov Chain AI Text Composer", layout="wide")
-st.markdown("""
-    <style>
-    .typing-text {
-        font-family: 'Courier New', monospace;
-        font-size: 18px;
-        white-space: pre-wrap;
-        border-left: 3px solid #00FFAA;
-        padding-left: 10px;
-        animation: blink 1s steps(2, start) infinite;
-    }
-    @keyframes blink {
-        to { border-color: transparent }
-    }
-    </style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="📄 PDF & TXT Viewer + AI Generator", layout="wide")
+st.title("📄 Full File Viewer + ✨ Markov Chain AI Generator")
 
-def build_markov_chain(text, retain_punctuation=False):
-    if not retain_punctuation:
-        text = re.sub(r'[^\w\s]', '', text)
-    words = text.lower().split()
-    chain = {}
-    for current_word, next_word in zip(words, words[1:]):
-        chain.setdefault(current_word, []).append(next_word)
-    return chain
+uploaded_file = st.file_uploader("📂 Upload any full .pdf or .txt file from your computer", type=["pdf", "txt"])
+extracted_text = ""
 
-def generate_text(chain, start_word, length=50, seed=None):
-    if seed is not None:
-        random.seed(seed)
-    word = start_word.lower()
-    result = [word]
-    for _ in range(length - 1):
-        next_words = chain.get(word)
-        if not next_words:
-            break
-        word = random.choice(next_words)
-        result.append(word)
-    return ' '.join(result)
+if uploaded_file is not None:
+    st.success(f"✅ File '{uploaded_file.name}' uploaded!")
 
-def draw_graph(chain):
-    G = nx.DiGraph()
-    for word, next_words in chain.items():
-        for next_word in next_words:
-            G.add_edge(word, next_word)
-    fig, ax = plt.subplots(figsize=(12, 8))
-    nx.draw(G, with_labels=True, node_color='skyblue', edge_color='gray', node_size=1500, font_size=10, ax=ax)
-    st.pyplot(fig)
+    temp_path = os.path.join("temp", uploaded_file.name)
+    os.makedirs("temp", exist_ok=True)
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.read())
 
+    if uploaded_file.name.endswith(".pdf"):
+        try:
+            with pdfplumber.open(temp_path) as pdf:
+                all_text = []
+                for i, page in enumerate(pdf.pages):
+                    text = page.extract_text()
+                    if text:
+                        all_text.append(text)
+                extracted_text = "\n\n".join(all_text)
+        except Exception as e:
+            st.error(f"❌ PDF read failed: {e}")
 
-def display_typing(text):
-    placeholder = st.empty()
-    typed = ""
-    for char in text:
-        typed += char
-        placeholder.markdown(f"<div class='typing-text'>{typed}</div>", unsafe_allow_html=True)
-        time.sleep(0.03)
+    elif uploaded_file.name.endswith(".txt"):
+        try:
+            with open(temp_path, "r", encoding="utf-8") as f:
+                extracted_text = f.read()
+        except Exception as e:
+            st.error(f"❌ TXT read failed: {e}")
 
-st.title("✨ Markov Chain AI Text Composer")
-st.write("Generate creative text with AI using a Markov Chain model!")
+    os.remove(temp_path)
 
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    upload_file = st.file_uploader("Upload a .txt file (optional)", type=['txt'])
-    if upload_file is not None:
-        stringio = StringIO(upload_file.getvalue().decode("utf-8"))
-        user_input = stringio.read()
+    if extracted_text.strip():
+        st.markdown("### 📃 Full File Content:")
+        st.markdown(
+            f"""<div style='white-space: pre-wrap; background-color: #fdfdfd; padding: 1em; border-radius: 10px; font-family: "Courier New", monospace;'>{extracted_text}</div>""",
+            unsafe_allow_html=True,
+        )
     else:
-        user_input = st.text_area("Or type/paste your text here", height=200)
+        st.warning("⚠️ No readable text found in the uploaded file.")
 
-    start_word = st.text_input("Enter starting word")
-    length = st.slider("How many words to generate?", 10, 200, 50, 10)
-    seed = st.text_input("Random seed (optional)")
-    retain_punct = st.checkbox("Keep punctuation?", False)
+    if extracted_text.strip():
+        if st.button("✨ Generate AI Text using Markov Chain"):
+            def build_markov_model(text, n=2):
+                model = defaultdict(list)
+                words = text.split()
+                for i in range(len(words) - n):
+                    key = tuple(words[i:i + n])
+                    model[key].append(words[i + n])
+                return model
 
-    generate = st.button("Generate Text")
+            def generate_markov_text(model, n=2, max_words=150):
+                if not model:
+                    return "❌ Not enough text to generate output."
+                start = random.choice(list(model.keys()))
+                output = list(start)
+                for _ in range(max_words):
+                    state = tuple(output[-n:])
+                    next_word = random.choice(model[state]) if state in model else None
+                    if next_word:
+                        output.append(next_word)
+                    else:
+                        break
+                return ' '.join(output)
 
-with col2:
-    st.subheader("Settings & Theme")
-    st.toggle("Dark Mode (System default applies)")
-    st.info("Your input will create an AI-powered text with Markov logic.")
+            model = build_markov_model(extracted_text)
+            generated_text = generate_markov_text(model)
 
-if generate and user_input and start_word:
-    try:
-        seed_val = int(seed) if seed else None
-    except ValueError:
-        seed_val = None
-
-    chain = build_markov_chain(user_input, retain_punctuation=retain_punct)
-    output_text = generate_text(chain, start_word, length, seed=seed_val)
-
-    st.markdown("### Generated Output:")
-    display_typing(output_text)
-
-    st.download_button("Download Text", output_text, file_name="generated_text.txt")
-    st.code(output_text, language='text')
-    st.success("Text generated successfully!")
-
-    st.markdown("""
-    <button onclick="copyText()" style="padding:10px 20px; font-size:16px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer;">Copy Generated Text</button>
-
-    <script>
-    function copyText() {
-        const text = document.querySelector('code').innerText;
-        navigator.clipboard.writeText(text).then(function() {
-            alert("Copied to clipboard!");
-        }, function(err) {
-            alert("Failed to copy text!");
-        });
-    }
-    </script>
-    """, unsafe_allow_html=True)
-    with st.expander("Show Word Transition Graph"):
-        draw_graph(chain)
-
-elif generate:
-    st.warning("Please enter both input text and a starting word.")
+            st.markdown("### 🤖 AI Generated Text (Markov Chain Style):")
+            st.markdown(
+                f"""<div style='white-space: pre-wrap; background-color: #e7faff; padding: 1em; border-radius: 10px; font-family: "Courier New", monospace;'>{generated_text}</div>""",
+                unsafe_allow_html=True,
+            )

@@ -31,7 +31,7 @@ def binary_search(l, target, low=None, high=None):
 def visualize_search_process(l, target, search_type="Naive"):
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(l, label="Array", color="blue", alpha=0.6)
-    
+
     if search_type == "Naive":
         for i, val in enumerate(l):
             if val == target:
@@ -49,6 +49,8 @@ def visualize_search_process(l, target, search_type="Naive"):
                 low = mid + 1
             else:
                 high = mid - 1
+
+    ax.legend()
     st.pyplot(fig)
 
 def plot_performance_graph(lengths, naive_times, binary_times):
@@ -66,11 +68,13 @@ def main():
 
     length = st.slider("Select array size:", min_value=10, max_value=20000, value=1000, step=100)
 
-    target_value = st.number_input("Enter target value to search:", value=random.randint(-3*length, 3*length))
+    if "target_input" not in st.session_state:
+        st.session_state["target_input"] = random.randint(-3 * length, 3 * length)
+
+    target_value = st.number_input("Enter target value to search:", key="target_input")
 
     if st.button("Generate and Compare"):
-
-        sorted_list = sorted(random.sample(range(-3*length, 3*length), length))
+        sorted_list = sorted(random.sample(range(-3 * length, 3 * length), length))
 
         start = time.time()
         for target in sorted_list:
@@ -87,7 +91,7 @@ def main():
         st.success(f"✅ Array of size `{length}` generated and searched.")
         st.write(f"📌 **Naive Search Time:** `{naive_time:.6f}` seconds")
         st.write(f"📌 **Binary Search Time:** `{binary_time:.6f}` seconds")
- 
+
         st.subheader("Visualizing Search Process")
         visualize_search_process(sorted_list, target_value, search_type="Naive")
         st.write("### Binary Search Visualization")
@@ -98,10 +102,10 @@ def main():
         lengths = [100, 500, 1000, 5000, 10000]
         naive_times = []
         binary_times = []
-        
+
         for length in lengths:
-            sorted_list = sorted(random.sample(range(-3*length, 3*length), length))
-      
+            sorted_list = sorted(random.sample(range(-3 * length, 3 * length), length))
+
             start = time.time()
             for target in sorted_list:
                 naive_search(sorted_list, target)
